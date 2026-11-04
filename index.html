@@ -1,0 +1,405 @@
+
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#090b10">
+<title>NikMaker Mini App</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#090b10;color:#f5f6fa;font-family:Arial,sans-serif}
+button,input,select{font:inherit}
+.app{max-width:650px;margin:auto;padding:17px 13px 35px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}
+.logo{font-size:24px;font-weight:900;letter-spacing:1px}
+.logo span{color:#299cff}
+select{background:#171e2b;color:white;border:1px solid #29364b;border-radius:10px;padding:9px}
+h2{font-size:16px;margin:22px 0 12px}
+.inputbox{background:#121722;border:1px solid #29364b;border-radius:14px;padding:13px}
+input{width:100%;background:transparent;border:0;outline:0;color:white;font-size:17px;padding:8px}
+.buttons{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
+.btn{border:0;border-radius:11px;padding:13px 8px;font-weight:bold;background:#202a3a;color:white;cursor:pointer}
+.primary{background:#1688ed}
+.green{background:#168c68}
+button:active{opacity:.75;transform:scale(.98)}
+.emojis{display:flex;flex-wrap:wrap;gap:7px}
+.emoji{background:#171e2b;border:1px solid #29364b;border-radius:9px;padding:9px;font-size:19px;color:white;cursor:pointer}
+.emoji.active{border-color:#1688ed;background:#142b45}
+.pages{display:flex;gap:6px;overflow-x:auto;padding:3px 0 12px}
+.page{min-width:37px;padding:9px 5px;border:1px solid #29364b;background:#151b26;color:white;border-radius:9px}
+.page.active{background:#1688ed;border-color:#1688ed}
+.styles{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.style{background:#121722;border:1px solid #263248;border-radius:12px;padding:11px;min-width:0}
+.style.selected{border:1px solid #1688ed;background:#142338}
+.style-text{font-size:16px;overflow-wrap:anywhere;min-height:26px;margin-bottom:10px;line-height:1.5}
+.style-bottom{display:flex;justify-content:space-between;align-items:center;gap:5px}
+.number{font-size:11px;color:#8190a7}
+.small{border:0;border-radius:7px;padding:7px 10px;background:#26364b;color:white}
+.selected .small{background:#1688ed}
+.empty{grid-column:1/-1;padding:24px;text-align:center;background:#121722;border-radius:12px;color:#8190a7}
+.footer{text-align:center;color:#66758c;font-size:12px;margin-top:25px}
+.ad-list{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.ad{display:block;background:#121722;border:1px solid #263248;border-radius:11px;overflow:hidden;text-decoration:none;color:white}
+.ad img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block}
+.ad div{padding:9px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header>
+  <div class="logo">NIK<span>MAKER</span></div>
+  <select id="language" onchange="setLanguage(this.value)">
+    <option value="uz">UZ</option>
+    <option value="ru">RU</option>
+    <option value="en">EN</option>
+  </select>
+</header>
+
+<h2 id="title">✍️ Nik yoki matn kiriting</h2>
+<div class="inputbox">
+  <input id="nickname" maxlength="64" placeholder="Nikni kiriting..." oninput="generate()">
+  <div class="buttons">
+    <button class="btn primary" id="makeBtn" onclick="generate()">✨ Yasash</button>
+    <button class="btn" id="randomBtn" onclick="randomNickname()">🎲 Tasodifiy nik</button>
+    <button class="btn green" id="copyBtn" onclick="copySelected()">📋 Nusxalash</button>
+    <button class="btn" id="clearBtn" onclick="clearAll()">🗑 Tozalash</button>
+  </div>
+</div>
+
+<h2 id="emojiTitle">😀 Emoji qo‘shish</h2>
+<div class="emojis" id="emojiList"></div>
+
+<h2 id="stylesTitle">🎨 100 ta nik stili</h2>
+<div class="pages" id="pages"></div>
+<div class="styles" id="styles"></div>
+
+<div class="buttons">
+  <button class="btn" id="copyPageBtn" onclick="copyPage()">📋 Sahifani nusxalash</button>
+  <button class="btn primary" id="nextBtn" onclick="nextPage()">Keyingi →</button>
+</div>
+
+<h2 id="adsTitle">📢 Reklama</h2>
+<div class="ad-list" id="ads">
+  <div class="empty">Reklamalar hozircha mavjud emas</div>
+</div>
+
+<div class="footer">NIKMAKER MINI APP · 100 STYLES</div>
+</div>
+
+<script>
+const tg=window.Telegram?.WebApp;
+if(tg){tg.ready();tg.expand();}
+
+const NORMAL="abcdefghijklmnopqrstuvwxyz";
+const UPPER_NORMAL="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+const FONT_STRINGS=[
+"𝐚𝐛𝐜𝐝𝐞𝐟𝐠𝐡𝐢𝐣𝐤𝐥𝐦𝐧𝐨𝐩𝐪𝐫𝐬𝐭𝐮𝐯𝐰𝐱𝐲𝐳",
+"𝑎𝑏𝑐𝑑𝑒𝑓𝑔ℎ𝑖𝑗𝑘𝑙𝑚𝑛𝑜𝑝𝑞𝑟𝑠𝑡𝑢𝑣𝑤𝑥𝑦𝑧",
+"𝒂𝒃𝒄𝒅𝒆𝒇𝒈𝒉𝒊𝒋𝒌𝒍𝒎𝒏𝒐𝒑𝒒𝒓𝒔𝒕𝒖𝒗𝒘𝒙𝒚𝒛",
+"𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃",
+"𝔞𝔟𝔠𝔡𝔢𝔣𝔤𝔥𝔦𝔧𝔨𝔩𝔪𝔫𝔬𝔭𝔮𝔯𝔰𝔱𝔲𝔳𝔴𝔵𝔶𝔷",
+"𝕒𝕓𝕔𝕕𝕖𝕗𝕘𝕙𝕚𝕛𝕜𝕝𝕞𝕟𝕠𝕡𝕢𝕣𝕤𝕥𝕦𝕧𝕨𝕩𝕪𝕫",
+"𝖆𝖇𝖈𝖉𝖊𝖋𝖌𝖍𝖎𝖏𝖐𝖑𝖒𝖓𝖔𝖕𝖖𝖗𝖘𝖙𝖚𝖛𝖜𝖝𝖞𝖟",
+"𝗮𝗯𝗰𝗱𝗲𝗳𝗴𝗵𝗶𝗷𝗸𝗹𝗺𝗻𝗼𝗽𝗾𝗿𝘀𝘁𝘂𝘃𝘄𝘅𝘆𝘇",
+"𝘢𝘣𝘤𝘥𝘦𝘧𝘨𝘩𝘪𝘫𝘬𝘭𝘮𝘯𝘰𝘱𝘲𝘳𝘴𝘵𝘶𝘷𝘸𝘹𝘺𝘻",
+"𝚊𝚋𝚌𝚍𝚎𝚏𝚐𝚑𝚒𝚓𝚔𝚕𝚖𝚗𝚘𝚙𝚚𝚛𝚜𝚝𝚞𝚟𝚠𝚡𝚢𝚣"
+];
+
+const UPPER_FONT_STRINGS=[
+"𝐀𝐁𝐂𝐃𝐄𝐅𝐆𝐇𝐈𝐉𝐊𝐋𝐌𝐍𝐎𝐏𝐐𝐑𝐒𝐓𝐔𝐕𝐖𝐗𝐘𝐙",
+"𝐴𝐵𝐶𝐷𝐸𝐹𝐺𝐻𝐼𝐽𝐾𝐿𝑀𝑁𝑂𝑃𝑄𝑅𝑆𝑇𝑈𝑉𝑊𝑋𝑌𝑍",
+"𝑨𝑩𝑪𝑫𝑬𝑭𝑮𝑯𝑰𝑱𝑲𝑳𝑴𝑵𝑶𝑷𝑸𝑹𝑺𝑻𝑼𝑽𝑾𝑿𝒀𝒁",
+"𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩",
+"𝔄𝔅ℭ𝔇𝔈𝔉𝔊ℌℑ𝔍𝔎𝔏𝔐𝔑𝔒𝔓𝔔ℜ𝔖𝔗𝔘𝔙𝔚𝔛𝔜ℨ",
+"𝔸𝔹ℂ𝔻𝔼𝔽𝔾ℍ𝕀𝕁𝕂𝕃𝕄ℕ𝕆ℙℚℝ𝕊𝕋𝕌𝕍𝕎𝕏𝕐ℤ",
+"𝕬𝕭𝕮𝕯𝕰𝕱𝕲𝕳𝕴𝕵𝕶𝕷𝕸𝕹𝕺𝕻𝕼𝕽𝕾𝕿𝖀𝖁𝖂𝖃𝖄𝖅",
+"𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭",
+"𝘈𝘉𝘊𝘋𝘌𝘍𝘎𝘏𝘐𝘑𝘒𝘓𝘔𝘕𝘖𝘗𝘘𝘙𝘚𝘛𝘜𝘝𝘞𝘟𝘠𝘡",
+"𝙰𝙱𝙲𝙳𝙴𝙵𝙶𝙷𝙸𝙹𝙺𝙻𝙼𝙽𝙾𝙿𝚀𝚁𝚂𝚃𝚄𝚅𝚆𝚇𝚈𝚉"
+];
+
+const DECORATIONS=[
+["",""],
+["꧁༺ "," ༻꧂"],
+["『","』"],
+["亗 "," 亗"],
+["ツ "," ツ"],
+["★彡 "," 彡★"],
+["✵ "," ✵"],
+["么","么"],
+["•° "," °•"],
+["乂","乂"]
+];
+
+const EMOJIS=[
+"🔥","⚡","👑","💎","🖤","✨",
+"☠️","亗","ツ","♡","★","么","𐙚",
+"ᥫ᭡","𖤐","❀","ꨄ︎","𓍯𓂃","✮⋆˙",
+"𓍼","×̷̷͜×̷",".⋆♱","✵"
+];
+
+const RANDOM_NAMES=[
+"😻⃝⃙⃦⃘꯭⃖🇧🇲⃝⃙⃘꯭꯭⃖ ⃦꯭ ꯭꯭𝐁꯭𝐄꯭𝐊꯭[꯭✵꯭]𝐒꯭𝐇꯭𝐄꯭𝐘꯭𝐓꯭𝐀꯭𝐍꯭🇧🇲⃝⃙⃦꯭⃖🐊⃝⃙⃦꯭ᬽ",
+"꯭🌚꯭𝐗꦳ꦿꦷꦹ꯭ ꯭𝐔꦳꯭ꦿꦷꦹ꯭𝐑꦳꯭ꦿꦷꦹ꯭𝐒꦳꯭ꦿꦷꦹ꯭𝐇꦳꯭ꦿꦷꦹ꯭𝐈꦳꯭ꦿꦷꦹ꯭𝐃꦳꯭ꦿꦷꦹ꯭꯭🔥꙰꙲꯭🌙꙲꙰꯭𝐁꯭꯭ ꦳ꦿꦷꦹ꯭𝐑꦳꯭ꦿꦷꦹ꯭𝐎꦳꯭ꦿꦷꦹ꯭🌿",
+" ✹꯭🇺🇿꯭🇧꯭𝗨꯭𝗬꯭𝗨꯭𝗞꯭ ꯭𝗕꯭𝗢꯭𝗟꯭𝗔꯭Ξ꯭🕋꯭꯭",
+"➪꦳꯭ꦿ꯭🥇꦳꯭ꦿ꯭➤꯭✶꯭̈́̈́̈́̈́𝐂꯭𝐑꯭𝐄꯭𝐀꯭𝐓꯭𝐎꯭𝐑꯭✶꯭̈́̈́̈́̈́➤꦳꯭ꦿ꯭⸙꦳꯭ꦿ꯭⚜",
+"⚞꯭✆꯭ʙ꯭ᷩʀ꯭ᷢᴀ꯭ᷧᴛ꯭꯭ⷮᴀ꯭ᷧɴ꯭꯭ᷡ✆꯭⚟꯭",
+"🌙☪️📿꯭꯭꯭꯭𝐌꯭꯭꯭꯭𝐚꯭꯭꯭꯭𝐚 𝐬꯭꯭꯭꯭𝐡꯭꯭꯭꯭𝐚꯭꯭꯭꯭ 𝐀𝐥꯭꯭꯭꯯𝐥𝐨꯭꯭꯭꯭𝐡꯭꯭ ꯭ ꯭🕋꯭🌙꯭✵彡",
+"𓄂꯭ᬼ꯭꯭꯭𓄻꯭꯭࿐꯭꯭꯭𖥫꯭̎̎̎̄̌̂𝗔꯭𔒼꯭𝗞꯭𔒼꯭𝗔꯭𔒼꯭𝗛꯭𔒼꯭𝗢꯭𔒼꯭𝗡꯭𔒼꯭𝗜꯭𔒼꯭𝗡꯭𔒼꯭꯭꯭𖥫꯭꯭꯭̎̎̎̄̌̂𓄂꯭꯭ᬼ꯭꯭𓄻꯭࿐",
+"꯭꯭𝄄𝄁𝄄꯭❤️꯭𝄄𝄁𝄄꯭̲̲̲̱̻̩̬̬𝐁꯭̅̅ⷡ𑜞꯭᭄꯭𝐎꯭̅̅ⷪ𑜞꯭꯭꯭᭄꯭𝐌꯭꯭꯭̅̅ᷟ𑜞꯭᭄𝐁꯭꯭̅̅ⷡ𑜞᭄꯭𝐀꯭̅̅ⷽ𝄄𝄁𝄄꯭̲̲̲̱̻̩̬̬💣꯭𝄄𝄁𝄄꯭",
+"꯭⬪[꯭🇦🇫꯭꯭ ]꯭𝙳҄𝙰꯭҄𝙳҄𝙴꯭҄𝙽꯭҄ 𝙰꯭҄𝚅꯭҄҄𝙶꯭҄'𝙰꯭҄𝙽҄𝙸꯭҄𝚂҄𝙺꯭꯭҄𝙸҄𝚈꯭҄ [꯭🇦🇫꯭]꯭⬪"
+];
+
+const LANG={
+uz:{
+title:"✍️ Nik yoki matn kiriting",placeholder:"Nikni kiriting...",
+make:"✨ Yasash",random:"🎲 Tasodifiy nik",copy:"📋 Nusxalash",
+clear:"🗑 Tozalash",emoji:"😀 Emoji qo‘shish",
+styles:"🎨 100 ta nik stili",copyPage:"📋 Sahifani nusxalash",
+next:"Keyingi →",ads:"📢 Reklama",empty:"Reklamalar hozircha mavjud emas",
+selected:"Tanlash",copied:"Nusxalandi!",emptyInput:"Avval nik kiriting"
+},
+ru:{
+title:"✍️ Введите ник или текст",placeholder:"Введите ник...",
+make:"✨ Создать",random:"🎲 Случайный ник",copy:"📋 Копировать",
+clear:"🗑 Очистить",emoji:"😀 Добавить эмодзи",
+styles:"🎨 100 стилей ника",copyPage:"📋 Копировать страницу",
+next:"Далее →",ads:"📢 Реклама",empty:"Рекламы пока нет",
+selected:"Выбрать",copied:"Скопировано!",emptyInput:"Сначала введите ник"
+},
+en:{
+title:"✍️ Enter nickname or text",placeholder:"Enter nickname...",
+make:"✨ Generate",random:"🎲 Random nickname",copy:"📋 Copy",
+clear:"🗑 Clear",emoji:"😀 Add emoji",
+styles:"🎨 100 nickname styles",copyPage:"📋 Copy page",
+next:"Next →",ads:"📢 Advertisement",empty:"No advertisements yet",
+selected:"Select",copied:"Copied!",emptyInput:"Enter a nickname first"
+}
+};
+
+let lang="uz";
+let page=0;
+let selected=0;
+let results=[];
+let emojiMode=false;
+let chosenEmoji="";
+
+function stylize(text,index){
+  const font=index%10;
+  const decoration=Math.floor(index/10)%10;
+  let converted="";
+
+  for(const ch of text){
+    const lower=NORMAL.indexOf(ch.toLowerCase());
+
+    if(lower===-1){
+      converted+=ch;
+      continue;
+    }
+
+    if(ch!==ch.toLowerCase()){
+      converted+=Array.from(UPPER_FONT_STRINGS[font])[lower]||ch;
+    }else{
+      converted+=Array.from(FONT_STRINGS[font])[lower]||ch;
+    }
+  }
+
+  const d=DECORATIONS[decoration];
+  return d[0]+converted+d[1];
+}
+
+function generate(){
+  const text=document.getElementById("nickname").value.trim();
+
+  if(!text){
+    results=[];
+    render();
+    return;
+  }
+
+  results=Array.from({length:100},(_,i)=>{
+    let value=stylize(text,i);
+    if(emojiMode&&chosenEmoji)value=chosenEmoji+" "+value+" "+chosenEmoji;
+    return value;
+  });
+
+  selected=0;
+  render();
+}
+
+function randomNickname(){
+  const name=RANDOM_NAMES[Math.floor(Math.random()*RANDOM_NAMES.length)];
+  const style=Math.floor(Math.random()*100);
+  let result=stylize(name,style);
+
+  if(emojiMode){
+    const e=EMOJIS[Math.floor(Math.random()*EMOJIS.length)];
+    result=e+" "+result+" "+e;
+  }
+
+  results=Array(100).fill(result);
+  selected=0;
+  page=0;
+  document.getElementById("nickname").value=name;
+  render();
+}
+
+function addEmoji(value){
+  chosenEmoji=value;
+  emojiMode=true;
+  generate();
+  renderEmoji();
+}
+
+function clearAll(){
+  document.getElementById("nickname").value="";
+  results=[];
+  selected=0;
+  page=0;
+  emojiMode=false;
+  chosenEmoji="";
+  render();
+}
+
+function setLanguage(value){
+  lang=value;
+  const t=LANG[lang];
+
+  document.getElementById("title").textContent=t.title;
+  document.getElementById("nickname").placeholder=t.placeholder;
+  document.getElementById("makeBtn").textContent=t.make;
+  document.getElementById("randomBtn").textContent=t.random;
+  document.getElementById("copyBtn").textContent=t.copy;
+  document.getElementById("clearBtn").textContent=t.clear;
+  document.getElementById("emojiTitle").textContent=t.emoji;
+  document.getElementById("stylesTitle").textContent=t.styles;
+  document.getElementById("copyPageBtn").textContent=t.copyPage;
+  document.getElementById("nextBtn").textContent=t.next;
+  document.getElementById("adsTitle").textContent=t.ads;
+
+  render();
+}
+
+function renderEmoji(){
+  document.getElementById("emojiList").innerHTML=EMOJIS.map(e=>
+    `<button class="emoji ${chosenEmoji===e?"active":""}" onclick="addEmoji('${e}')">${e}</button>`
+  ).join("");
+}
+
+function renderPages(){
+  document.getElementById("pages").innerHTML=Array.from({length:10},(_,i)=>
+    `<button class="page ${page===i?"active":""}" onclick="changePage(${i})">${i+1}</button>`
+  ).join("");
+}
+
+function renderStyles(){
+  const container=document.getElementById("styles");
+
+  if(!results.length){
+    container.innerHTML=`<div class="empty">${LANG[lang].emptyInput}</div>`;
+    return;
+  }
+
+  const start=page*10;
+  container.innerHTML=results.slice(start,start+10).map((value,i)=>{
+    const index=start+i;
+    return `
+      <div class="style ${selected===index?"selected":""}" onclick="selectStyle(${index})">
+        <div class="style-text">${escapeHTML(value)}</div>
+        <div class="style-bottom">
+          <span class="number">#${index+1}</span>
+          <button class="small" onclick="event.stopPropagation();copyOne(${index})">${LANG[lang].selected}</button>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+function escapeHTML(text){
+  return text.replace(/[&<>"']/g,c=>({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  })[c]);
+}
+
+function render(){
+  renderEmoji();
+  renderPages();
+  renderStyles();
+}
+
+function selectStyle(index){
+  selected=index;
+  renderStyles();
+}
+
+function changePage(value){
+  page=Math.max(0,Math.min(9,value));
+  render();
+}
+
+function nextPage(){
+  page=(page+1)%10;
+  render();
+}
+
+async function copyText(text){
+  if(!text)return;
+
+  try{
+    if(navigator.clipboard&&window.isSecureContext){
+      await navigator.clipboard.writeText(text);
+    }else{
+      const area=document.createElement("textarea");
+      area.value=text;
+      area.style.position="fixed";
+      area.style.opacity="0";
+      document.body.appendChild(area);
+      area.select();
+      document.execCommand("copy");
+      area.remove();
+    }
+
+    if(tg&&tg.showPopup){
+      tg.showPopup({message:LANG[lang].copied});
+    }else{
+      alert(LANG[lang].copied);
+    }
+  }catch(e){
+    alert("Nusxalashda xatolik yuz berdi");
+  }
+}
+
+function copyOne(index){
+  selected=index;
+  copyText(results[index]);
+}
+
+function copySelected(){
+  if(!results.length)return alert(LANG[lang].emptyInput);
+  copyText(results[selected]);
+}
+
+function copyPage(){
+  if(!results.length)return alert(LANG[lang].emptyInput);
+  const start=page*10;
+  copyText(results.slice(start,start+10).join("\n"));
+}
+
+/*
+  REKLAMA API:
+  Reklamalarni Python serverdan olish uchun server manzili
+  va API endpoint kerak bo'ladi. Hozircha HTML mustaqil ishlaydi.
+*/
+async function loadAds(){
+  document.getElementById("ads").innerHTML=
+    `<div class="empty">${LANG[lang].empty}</div>`;
+}
+
+render();
+loadAds();
+</script>
+</body>
+</html>
